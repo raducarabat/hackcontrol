@@ -4,9 +4,9 @@
   "display": "standalone",
   "scope": "/",
   "start_url": "/",
-  "name": "Project Hackathon",
-  "short_name": "phck",
-  "description": "An open source hackathon management built with Next.js & Supabase",
+  "name": "Hackcontrol",
+  "short_name": "hcl",
+  "description": "An open source hackathon management built with Next.js",
   "icons": [
     {
       "src": "/images/icon-192x192.png",

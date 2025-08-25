@@ -19,7 +19,7 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 z-50 block w-full bg-neutral-900/80 py-4 px-5 font-medium text-gray-200">
+    <header className="fixed top-0 z-50 block w-full bg-neutral-900/80 px-5 py-4 font-medium text-gray-200">
       <div className="flex items-center justify-between">
         <Link href="/" underline={false}>
           <div className="flex items-center space-x-3 transition-all duration-100 hover:text-white">
@@ -36,6 +36,11 @@ const Header = () => {
           <div className="flex items-center space-x-3">
             <Up>
               <div className="flex items-center space-x-3">
+                {session.user.role === "ADMIN" && (
+                  <span className="rounded-full bg-green-600 px-2 py-1 text-xs font-medium text-white">
+                    ADMIN
+                  </span>
+                )}
                 <Image
                   src={session.user.image}
                   width={24}

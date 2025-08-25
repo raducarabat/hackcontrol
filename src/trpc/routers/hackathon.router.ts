@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "..";
+import {
+  adminProcedure,
+  createTRPCRouter,
+  publicProcedure,
+  protectedProcedure,
+} from "..";
 
 // Schemas:
 import {
@@ -10,131 +15,340 @@ import {
 
 export const hackathonRouter = createTRPCRouter({
   //------
-  // Get all hackathons by user =>
-  allHackathons: publicProcedure.query(({ ctx }) => {
-    const hackathon = ctx.prisma.hackathon.findMany({
-      where: {
-        creatorId: ctx.session?.user?.id,
-      },
-    });
-    const participants = ctx.prisma.participation.findMany({
-      where: {
-        creatorId: ctx.session?.user?.id,
-      },
-    });
-    return Promise.all([hackathon, participants]).then((values) => {
+  // Get all hackathons - different behavior based on user role =>
+  allHackathons: protectedProcedure.query(async ({ ctx }) => {
+    // For ADMIN users: show only their created hackathons
+    // For USER users: show all available hackathons
+    if (ctx.session.user.role === "ADMIN") {
+      const hackathon = await ctx.prisma.hackathon.findMany({
+        where: {
+          creatorId: ctx.session.user.id,
+        },
+      });
+      const participants = await ctx.prisma.participation.findMany({
+        where: {
+          creatorId: ctx.session.user.id,
+        },
+      });
       return {
-        hackathon: values[0],
-        participants: values[1],
+        hackathon,
+        participants,
       };
-    });
+    } else {
+      // Regular users see all available hackathons
+      const hackathon = await ctx.prisma.hackathon.findMany({
+        where: {
+          verified: true, // Only show verified hackathons to regular users
+        },
+      });
+      const participants = await ctx.prisma.participation.findMany({
+        where: {
+          creatorId: ctx.session.user.id,
+        },
+      });
+      return {
+        hackathon,
+        participants,
+      };
+    }
   }),
+
   //------
-  // Create new hackathon =>
-  createHackathon: publicProcedure
+  // Get all available hackathons (for all users) =>
+  allAvailableHackathons: publicProcedure.query(async ({ ctx }) => {
+    const hackathons = await ctx.prisma.hackathon.findMany({
+      where: {
+        verified: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        url: true,
+        is_finished: true,
+        updatedAt: true,
+      },
+    });
+
+    // If user is logged in, also get their participations
+    let userParticipations: { hackathon_url: string }[] = [];
+    if (ctx.session?.user?.id) {
+      userParticipations = await ctx.prisma.participation.findMany({
+        where: {
+          creatorId: ctx.session.user.id,
+        },
+        select: {
+          hackathon_url: true,
+        },
+      });
+    }
+
+    return {
+      hackathons,
+      userParticipations,
+    };
+  }),
+
+  //------
+  // Create new hackathon (ADMIN only) =>
+  createHackathon: adminProcedure
     .input(newHackathonSchema)
-    .mutation(({ ctx, input }) => {
-      const newHackathon = ctx.prisma.hackathon.create({
+    .mutation(async ({ ctx, input }) => {
+      const newHackathon = await ctx.prisma.hackathon.create({
         data: {
-          ...input,
-          creatorId: ctx.session?.user?.id,
+          name: input.name,
+          url: input.url,
+          description: input.description,
+          rules: input.rules,
+          criteria: input.criteria,
+          is_finished: input.is_finished,
+          creatorId: ctx.session.user.id,
+          verified: true, // Auto-verify for now
         },
       });
       return newHackathon;
     }),
+
   //------
-  // Edit hackathon =>
-  editHackathon: publicProcedure
+  // Edit hackathon (ADMIN only, and must be creator) =>
+  editHackathon: adminProcedure
     .input(updateHackathonSchema)
-    .mutation(({ ctx, input }) => {
-      const editHackathon = ctx.prisma.hackathon.update({
+    .mutation(async ({ ctx, input }) => {
+      // First check if the user is the creator
+      const hackathon = await ctx.prisma.hackathon.findFirst({
+        where: {
+          id: input.id,
+          creatorId: ctx.session.user.id,
+        },
+      });
+
+      if (!hackathon) {
+        throw new Error(
+          "Hackathon not found or you don't have permission to edit it",
+        );
+      }
+
+      const editHackathon = await ctx.prisma.hackathon.update({
         where: {
           id: input.id,
         },
         data: {
-          ...input,
-          creatorId: ctx.session?.user?.id,
+          name: input.name,
+          description: input.description,
+          rules: input.rules,
+          criteria: input.criteria,
+          is_finished: input.is_finished,
         },
       });
       return editHackathon;
     }),
+
   //------
-  // Delete hackathon =>
-  deleteHackathon: publicProcedure
+  // Delete hackathon (ADMIN only, and must be creator) =>
+  deleteHackathon: adminProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(({ ctx, input }) => {
-      const deleteHackathon = ctx.prisma.hackathon.delete({
+    .mutation(async ({ ctx, input }) => {
+      // First check if the user is the creator
+      const hackathon = await ctx.prisma.hackathon.findFirst({
+        where: {
+          id: input.id,
+          creatorId: ctx.session.user.id,
+        },
+      });
+
+      if (!hackathon) {
+        throw new Error(
+          "Hackathon not found or you don't have permission to delete it",
+        );
+      }
+
+      const deleteHackathon = await ctx.prisma.hackathon.delete({
         where: {
           id: input.id,
         },
       });
       return deleteHackathon;
     }),
+
   //------
-  // Single hackathon with participants =>
-  singleHackathonWithParticipants: publicProcedure
+  // Get hackathon management view (ADMIN only, must be creator) =>
+  getHackathonManagement: adminProcedure
     .input(z.object({ url: z.string() }))
-    .query(({ ctx, input }) => {
-      const hackathon = ctx.prisma.hackathon.findUnique({
+    .query(async ({ ctx, input }) => {
+      const hackathon = await ctx.prisma.hackathon.findFirst({
         where: {
-          url_creatorId: {
-            url: input.url,
-            creatorId: ctx.session?.user?.id,
-          },
+          url: input.url,
+          creatorId: ctx.session.user.id,
         },
       });
-      const participants = ctx.prisma.participation.findMany({
+
+      if (!hackathon) {
+        return {
+          hackathon: null,
+          participants: [],
+          isOwner: false,
+        };
+      }
+
+      const participants = await ctx.prisma.participation.findMany({
         where: {
           hackathon_url: input.url,
         },
       });
-      return Promise.all([hackathon, participants]).then((values) => {
-        return {
-          hackathon: values[0],
-          participants: values[1],
-        };
-      });
+
+      return {
+        hackathon,
+        participants,
+        isOwner: true,
+      };
     }),
+
   //------
-  // Get a single hackathon by URL without creatorid & check if user is a participant =>
+  // Get hackathon public view (for all users) =>
+  getHackathonPublic: publicProcedure
+    .input(z.object({ url: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const hackathon = await ctx.prisma.hackathon.findUnique({
+        where: {
+          url: input.url,
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          rules: true,
+          criteria: true,
+          url: true,
+          is_finished: true,
+          creatorId: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!hackathon) {
+        return {
+          hackathon: null,
+          userParticipation: null,
+          isOwner: false,
+        };
+      }
+
+      // Check if current user is the owner
+      const isOwner =
+        ctx.session?.user?.id === hackathon.creatorId &&
+        ctx.session?.user?.role === "ADMIN";
+
+      // Get user's participation if logged in
+      let userParticipation = null;
+      if (ctx.session?.user?.id) {
+        userParticipation = await ctx.prisma.participation.findFirst({
+          where: {
+            hackathon_url: input.url,
+            creatorId: ctx.session.user.id,
+          },
+        });
+      }
+
+      return {
+        hackathon,
+        userParticipation,
+        isOwner,
+      };
+    }),
+
+  //------
+  // Single hackathon with participants (kept for backward compatibility) =>
+  singleHackathonWithParticipants: protectedProcedure
+    .input(z.object({ url: z.string() }))
+    .query(async ({ ctx, input }) => {
+      // This should only work for hackathon creators
+      if (ctx.session.user.role !== "ADMIN") {
+        return {
+          hackathon: null,
+          participants: [],
+        };
+      }
+
+      const hackathon = await ctx.prisma.hackathon.findFirst({
+        where: {
+          url: input.url,
+          creatorId: ctx.session.user.id,
+        },
+      });
+
+      if (!hackathon) {
+        return {
+          hackathon: null,
+          participants: [],
+        };
+      }
+
+      const participants = await ctx.prisma.participation.findMany({
+        where: {
+          hackathon_url: input.url,
+        },
+      });
+
+      return {
+        hackathon,
+        participants,
+      };
+    }),
+
+  //------
+  // Get a single hackathon by URL (for submission page) =>
   singleHackathon: publicProcedure
     .input(z.object({ url: z.string() }))
-    .query(({ ctx, input }) => {
-      const hackathon = ctx.prisma.hackathon.findUnique({
+    .query(async ({ ctx, input }) => {
+      const hackathon = await ctx.prisma.hackathon.findUnique({
         where: {
           url: input.url,
         },
       });
-      const participants = ctx.prisma.participation.findMany({
+
+      let participants: any[] = [];
+      if (ctx.session?.user?.id) {
+        participants = await ctx.prisma.participation.findMany({
+          where: {
+            hackathon_url: input.url,
+            creatorId: ctx.session.user.id,
+          },
+        });
+      }
+
+      return {
+        hackathon: JSON.parse(JSON.stringify(hackathon)),
+        participants: JSON.parse(JSON.stringify(participants)),
+      };
+    }),
+
+  //------
+  // Finish hackathon (ADMIN only, must be creator) =>
+  finishHackathon: adminProcedure
+    .input(z.object({ url: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // First check if the user is the creator
+      const hackathon = await ctx.prisma.hackathon.findFirst({
         where: {
-          hackathon_url: input.url,
-          creatorId: ctx.session?.user?.id,
+          url: input.url,
+          creatorId: ctx.session.user.id,
         },
       });
-      return Promise.all([hackathon, participants]).then((values) => {
-        return {
-          hackathon: JSON.parse(JSON.stringify(values[0])),
-          participants: JSON.parse(JSON.stringify(values[1])),
-        };
-      });
-    }),
-  //------
-  // Finish hackathon =>
-  finishHackathon: publicProcedure
-    .input(z.object({ url: z.string() }))
-    .mutation(({ ctx, input }) => {
-      const finishHackathon = ctx.prisma.hackathon.update({
+
+      if (!hackathon) {
+        throw new Error(
+          "Hackathon not found or you don't have permission to finish it",
+        );
+      }
+
+      const finishHackathon = await ctx.prisma.hackathon.update({
         where: {
-          url_creatorId: {
-            url: input.url,
-            creatorId: ctx.session?.user?.id,
-          },
+          id: hackathon.id,
         },
         data: {
           is_finished: true,
         },
       });
       return finishHackathon;
-    }
-    ),
+    }),
 });

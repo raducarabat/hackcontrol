@@ -15,7 +15,6 @@ import Show from "@/animations/show";
 
 // Layout:
 import Header from "@/layout/header";
-import Footer from "@/layout/footer";
 
 // SEO:
 import { DefaultSeo } from "next-seo";
@@ -53,7 +52,6 @@ const App: AppType<{ session: Session | null }> = ({
             },
           }}
         />
-        <Footer />
       </main>
     </SessionProvider>
   );

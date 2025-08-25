@@ -3,10 +3,12 @@ import { createTRPCRouter } from "@/trpc";
 // Hackathon router:
 import { hackathonRouter } from "./routers/hackathon.router";
 import { participationRouter } from "./routers/participation.router";
+import { announcementRouter } from "./routers/announcement.router";
 
 export const appRouter = createTRPCRouter({
   hackathon: hackathonRouter,
   participation: participationRouter,
+  announcement: announcementRouter,
 });
 
 // export type definition of API

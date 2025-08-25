@@ -4,6 +4,7 @@ import type { THackathon } from "@/types/hackathon.type";
 import { useRouter } from "next/navigation";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { nanoid } from "nanoid";
+import { useSession } from "next-auth/react";
 
 import { Plus } from "@/ui/icons";
 import { Modal, Button, Alert, Tip } from "@/ui";
@@ -12,15 +13,21 @@ import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
 const CreateNew = () => {
+  const { data: session } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState<boolean>();
-  let url = nanoid(6);
-
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<THackathon>();
+
+  let url = nanoid(6);
+
+  // Only allow admin users to create hackathons
+  if (!session || session.user.role !== "ADMIN") {
+    return null;
+  }
 
   const { mutate } = api.hackathon.createHackathon.useMutation({
     onSuccess: () => {

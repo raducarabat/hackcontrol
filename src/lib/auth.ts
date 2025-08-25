@@ -16,6 +16,7 @@ export const authOptions: NextAuthOptions = {
         session.user.username = token.username;
         session.user.email = token.email;
         session.user.image = token.image;
+        session.user.role = token.role;
       }
       return session;
     },
@@ -27,6 +28,7 @@ export const authOptions: NextAuthOptions = {
       });
       if (!dbUser) {
         token.id = user?.id;
+        token.role = "USER" as const; // Default role for new users
         return token;
       }
       return {
@@ -35,6 +37,7 @@ export const authOptions: NextAuthOptions = {
         username: dbUser.username,
         email: dbUser.email,
         image: dbUser.image,
+        role: (dbUser as any).role || "USER", // Fallback to USER if role doesn't exist yet
       };
     },
   },

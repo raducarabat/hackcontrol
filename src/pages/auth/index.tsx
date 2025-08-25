@@ -14,7 +14,7 @@ const Auth = () => {
     setLoading(true);
     try {
       await signIn(provider, {
-        callbackUrl: `/app`,
+        callbackUrl: `http://localhost:3000/app`,
       });
     } catch (error) {
       toast.error("Unable to log in. Please try again later.");

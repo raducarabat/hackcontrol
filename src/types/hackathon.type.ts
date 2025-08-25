@@ -3,6 +3,8 @@ export type THackathon = {
   name: string;
   url: string;
   description: string;
+  rules?: string;
+  criteria?: string;
   is_finished: boolean;
   owner: string;
   creation_date: Date;

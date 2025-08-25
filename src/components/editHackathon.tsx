@@ -62,6 +62,7 @@ const EditHackathon = (props: EditHackathonProps) => {
       <Tabs defaultValue="info" className="w-full">
         <TabsList className="mb-2 w-full">
           <TabsTrigger value="info">General</TabsTrigger>
+          <TabsTrigger value="rules">Rules & Criteria</TabsTrigger>
           <TabsTrigger value="finish">Finish hackathon</TabsTrigger>
           <TabsTrigger value="delete">Delete hackathon</TabsTrigger>
         </TabsList>
@@ -124,6 +125,58 @@ const EditHackathon = (props: EditHackathonProps) => {
                 icon={<SaveFloppyDisk width={17} />}
               >
                 {loading ? "Playing Kukoro..." : "Save"}
+              </Button>
+            </div>
+          </form>
+        </TabsContent>
+        <TabsContent value="rules">
+          <form className="mb-3 space-y-3" onSubmit={handleSubmit(onSubmit)}>
+            <div className="mb-6">
+              <label htmlFor="rules">Hackathon Rules:</label>
+              <textarea
+                id="rules"
+                defaultValue={props.rules || ""}
+                className={inputStyles}
+                placeholder="Enter hackathon rules (max 2000 characters)"
+                rows={6}
+                autoComplete="off"
+                disabled={loading}
+                {...register("rules", {
+                  maxLength: {
+                    value: 2000,
+                    message: "Rules must be less than 2000 characters",
+                  },
+                })}
+              />
+              {errors.rules && <Alert>{errors.rules?.message}</Alert>}
+            </div>
+            <div className="mb-6">
+              <label htmlFor="criteria">Judging Criteria:</label>
+              <textarea
+                id="criteria"
+                defaultValue={props.criteria || ""}
+                className={inputStyles}
+                placeholder="Enter judging criteria (max 2000 characters)"
+                rows={6}
+                autoComplete="off"
+                disabled={loading}
+                {...register("criteria", {
+                  maxLength: {
+                    value: 2000,
+                    message: "Criteria must be less than 2000 characters",
+                  },
+                })}
+              />
+              {errors.criteria && <Alert>{errors.criteria?.message}</Alert>}
+            </div>
+            <div className="flex flex-row-reverse">
+              <Button
+                type="submit"
+                disabled={loading}
+                loadingstatus={loading}
+                icon={<SaveFloppyDisk width={17} />}
+              >
+                {loading ? "Playing Kukoro..." : "Save Rules & Criteria"}
               </Button>
             </div>
           </form>

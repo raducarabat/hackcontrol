@@ -14,7 +14,7 @@ const Prepare = (props: PrepareProps) => {
           <h1 className="text-xl font-medium">1. Share your hackathon.</h1>
           <div className="ml-1 border-l border-neutral-800 p-4 text-neutral-400">
             <p>Share your hackathon by sending them the link below:</p>
-            <Copy url={`https://phck.vercel.app/send/${props.url}`} />
+            <Copy url={`localhost:3000/send/${props.url}`} />
             <p>
               💡 Users will have to log in to Project Hackathon before
               submit the project.
