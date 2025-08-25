@@ -29,7 +29,7 @@ const Header = () => {
               height={40}
               alt="Project Hackathon Logo"
             />
-            <p className="hidden md:block">Project Hackathon</p>
+            <p className="hidden md:block">Hackcontrol</p>
           </div>
         </Link>
         {session && (
