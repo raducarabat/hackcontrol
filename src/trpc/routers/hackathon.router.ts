@@ -4,6 +4,7 @@ import {
   createTRPCRouter,
   publicProcedure,
   protectedProcedure,
+  organizerProcedure,
 } from "..";
 
 // Schemas:
@@ -17,9 +18,9 @@ export const hackathonRouter = createTRPCRouter({
   //------
   // Get all hackathons - different behavior based on user role =>
   allHackathons: protectedProcedure.query(async ({ ctx }) => {
-    // For ADMIN users: show only their created hackathons
+    // For ADMIN/ORGANIZER users: show only their created hackathons
     // For USER users: show all available hackathons
-    if (ctx.session.user.role === "ADMIN") {
+    if (ctx.session.user.role === "ADMIN" || ctx.session.user.role === "ORGANIZER") {
       const hackathon = await ctx.prisma.hackathon.findMany({
         where: {
           creatorId: ctx.session.user.id,
@@ -90,10 +91,12 @@ export const hackathonRouter = createTRPCRouter({
   }),
 
   //------
-  // Create new hackathon (ADMIN only) =>
-  createHackathon: adminProcedure
+  // Create new hackathon (ADMIN/ORGANIZER only) =>
+  createHackathon: organizerProcedure
     .input(newHackathonSchema)
     .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      
       const newHackathon = await ctx.prisma.hackathon.create({
         data: {
           name: input.name,
@@ -102,16 +105,26 @@ export const hackathonRouter = createTRPCRouter({
           rules: input.rules,
           criteria: input.criteria,
           is_finished: input.is_finished,
-          creatorId: ctx.session.user.id,
+          creatorId: userId,
           verified: true, // Auto-verify for now
         },
       });
+
+      // Auto-assign creator as judge for their hackathon
+      await ctx.prisma.judge.create({
+        data: {
+          userId,
+          hackathonId: newHackathon.id,
+          invitedBy: userId, // Creator invites themselves
+        },
+      });
+
       return newHackathon;
     }),
 
   //------
-  // Edit hackathon (ADMIN only, and must be creator) =>
-  editHackathon: adminProcedure
+  // Edit hackathon (ADMIN/ORGANIZER only, and must be creator) =>
+  editHackathon: organizerProcedure
     .input(updateHackathonSchema)
     .mutation(async ({ ctx, input }) => {
       // First check if the user is the creator
@@ -144,8 +157,8 @@ export const hackathonRouter = createTRPCRouter({
     }),
 
   //------
-  // Delete hackathon (ADMIN only, and must be creator) =>
-  deleteHackathon: adminProcedure
+  // Delete hackathon (ADMIN/ORGANIZER only, and must be creator) =>
+  deleteHackathon: organizerProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // First check if the user is the creator
@@ -171,8 +184,8 @@ export const hackathonRouter = createTRPCRouter({
     }),
 
   //------
-  // Get hackathon management view (ADMIN only, must be creator) =>
-  getHackathonManagement: adminProcedure
+  // Get hackathon management view (ADMIN/ORGANIZER only, must be creator) =>
+  getHackathonManagement: organizerProcedure
     .input(z.object({ url: z.string() }))
     .query(async ({ ctx, input }) => {
       const hackathon = await ctx.prisma.hackathon.findFirst({
@@ -196,9 +209,16 @@ export const hackathonRouter = createTRPCRouter({
         },
       });
 
+      const judgeCount = await ctx.prisma.judge.count({
+        where: {
+          hackathonId: hackathon.id,
+        },
+      });
+
       return {
         hackathon,
         participants,
+        judgeCount,
         isOwner: true,
       };
     }),
@@ -236,7 +256,7 @@ export const hackathonRouter = createTRPCRouter({
       // Check if current user is the owner
       const isOwner =
         ctx.session?.user?.id === hackathon.creatorId &&
-        ctx.session?.user?.role === "ADMIN";
+        (ctx.session?.user?.role === "ADMIN" || ctx.session?.user?.role === "ORGANIZER");
 
       // Get user's participation if logged in
       let userParticipation = null;
@@ -262,7 +282,7 @@ export const hackathonRouter = createTRPCRouter({
     .input(z.object({ url: z.string() }))
     .query(async ({ ctx, input }) => {
       // This should only work for hackathon creators
-      if (ctx.session.user.role !== "ADMIN") {
+      if (ctx.session.user.role !== "ADMIN" && ctx.session.user.role !== "ORGANIZER") {
         return {
           hackathon: null,
           participants: [],
@@ -323,8 +343,72 @@ export const hackathonRouter = createTRPCRouter({
     }),
 
   //------
-  // Finish hackathon (ADMIN only, must be creator) =>
-  finishHackathon: adminProcedure
+  // Get hackathon judge view (for judges only) =>
+  getHackathonJudgeView: protectedProcedure
+    .input(z.object({ url: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const hackathon = await ctx.prisma.hackathon.findUnique({
+        where: { url: input.url },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          rules: true,
+          criteria: true,
+          url: true,
+          is_finished: true,
+          creatorId: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!hackathon) {
+        return {
+          hackathon: null,
+          participants: [],
+          isJudge: false,
+        };
+      }
+
+      const userId = ctx.session.user.id;
+      
+      // Check if user can judge this hackathon
+      const canJudge = ctx.session.user.role === "ADMIN" ||
+        hackathon.creatorId === userId ||
+        await ctx.prisma.judge.findUnique({
+          where: {
+            userId_hackathonId: {
+              userId,
+              hackathonId: hackathon.id,
+            },
+          },
+        });
+
+      if (!canJudge) {
+        return {
+          hackathon,
+          participants: [],
+          isJudge: false,
+        };
+      }
+
+      // Get participants for this hackathon
+      const participants = await ctx.prisma.participation.findMany({
+        where: {
+          hackathon_url: input.url,
+        },
+      });
+
+      return {
+        hackathon,
+        participants,
+        isJudge: true,
+      };
+    }),
+
+  //------
+  // Finish hackathon (ADMIN/ORGANIZER only, must be creator) =>
+  finishHackathon: organizerProcedure
     .input(z.object({ url: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // First check if the user is the creator

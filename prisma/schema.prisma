@@ -13,6 +13,7 @@ datasource db {
 
 enum Role {
   ADMIN
+  ORGANIZER
   USER
 }
 
@@ -42,6 +43,7 @@ model Hackathon {
   verified       Boolean         @default(false)
   participations Participation[]
   announcements  Announcement[]
+  Judge          Judge[]
 
   @@unique([url, creatorId])
   @@map(name: "hackathons")
@@ -116,20 +118,38 @@ model Session {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  name           String?
-  username       String?         @unique
-  email          String?         @unique
-  emailVerified  DateTime?
-  image          String?
-  role           Role            @default(USER)
-  access         Boolean         @default(true)
-  accounts       Account[]
-  sessions       Session[]
-  hackathons     Hackathon[]
-  participations Participation[]
+  id               String          @id @default(cuid())
+  name             String?
+  username         String?         @unique
+  email            String?         @unique
+  emailVerified    DateTime?
+  image            String?
+  role             Role            @default(USER)
+  access           Boolean         @default(true)
+  accounts         Account[]
+  sessions         Session[]
+  hackathons       Hackathon[]
+  participations   Participation[]
+  judgedHackathons Judge[]
+  invitedJudges    Judge[]         @relation("JudgeInviter")
 
   @@map(name: "users")
+}
+
+model Judge {
+  id          String   @id @default(cuid())
+  userId      String
+  hackathonId String
+  invitedBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  inviter   User      @relation("JudgeInviter", fields: [invitedBy], references: [id])
+
+  @@unique([userId, hackathonId])
+  @@map(name: "judges")
 }
 
 model VerificationToken {

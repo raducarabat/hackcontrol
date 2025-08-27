@@ -12,6 +12,7 @@ import Down from "@/animations/down";
 import CreateNew from "@/components/createNew";
 import EnterKey from "@/components/enterKey";
 import HackathonCard from "@/components/hackathonCard";
+import JudgesDashboard from "@/components/judgesDashboard";
 import Loading from "@/components/loading";
 
 const Dashboard = () => {
@@ -32,6 +33,8 @@ const Dashboard = () => {
   }
 
   const isAdmin = session?.user.role === "ADMIN";
+  const isOrganizer = session?.user.role === "ORGANIZER";
+  const canCreateHackathons = isAdmin || isOrganizer;
 
   return (
     <>
@@ -42,18 +45,18 @@ const Dashboard = () => {
         <h1 className="text-2xl font-medium">Dashboard</h1>
         <div className="flex items-center space-x-2">
           <EnterKey />
-          {isAdmin && <CreateNew />}
+          {canCreateHackathons && <CreateNew />}
         </div>
       </div>
       <div className="mx-auto mb-16 mt-8 max-w-6xl px-6 md:px-0">
         <div className="border-b border-neutral-800 pb-6">
           <div className="mb-4 flex items-center justify-between">
             <h1 className="text-2xl font-medium">
-              {isAdmin ? "My Hackathons" : "Available Hackathons"}
+              {canCreateHackathons ? "My Hackathons" : "Available Hackathons"}
             </h1>
-            {isAdmin && (
+            {canCreateHackathons && (
               <span className="rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white">
-                ADMIN VIEW
+                {isAdmin ? "ADMIN VIEW" : "ORGANIZER VIEW"}
               </span>
             )}
           </div>
@@ -102,12 +105,12 @@ const Dashboard = () => {
             <div className="flex flex-col items-center justify-center">
               <Up>
                 <h1 className="mb-2 text-2xl font-medium">
-                  {isAdmin ? "Welcome" : "No Hackathons Available"}
+                  {canCreateHackathons ? "Welcome" : "No Hackathons Available"}
                 </h1>
               </Up>
               <Down delay={0.2}>
                 <div className="flex flex-col items-center justify-center">
-                  {isAdmin ? (
+                  {canCreateHackathons ? (
                     <>
                       <p className="mb-2 text-center text-neutral-300">
                         You don&apos;t have any hackathons yet. Create one now!
@@ -130,6 +133,9 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {/* Judge Assignments Section */}
+        <JudgesDashboard />
 
         {/* Participations Section */}
         <h1 className="mb-4 mt-5 text-2xl font-medium">My Participations</h1>
@@ -214,11 +220,11 @@ const Dashboard = () => {
               <Down delay={0.2}>
                 <div className="flex flex-col items-center justify-center">
                   <p className="mb-4 text-center text-neutral-300">
-                    {isAdmin
+                    {canCreateHackathons
                       ? "You haven't participated in any hackathons yet."
                       : "Browse available hackathons above or enter a hackathon key to participate!"}
                   </p>
-                  {!isAdmin && (
+                  {!canCreateHackathons && (
                     <>
                       <ArrowDown width={32} className="mb-2" />
                       <EnterKey />
