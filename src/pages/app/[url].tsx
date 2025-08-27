@@ -32,11 +32,22 @@ const DashUrl = () => {
         url: url as string,
       },
       {
-        enabled: !!publicData?.isOwner && session?.user?.role === "ADMIN",
+        enabled: !!publicData?.isOwner && (session?.user?.role === "ADMIN" || session?.user?.role === "ORGANIZER"),
       },
     );
 
-  const isLoading = publicLoading || (publicData?.isOwner && managementLoading);
+  // Get judge view data if user might be a judge but not owner
+  const { data: judgeData, isLoading: judgeLoading } =
+    api.hackathon.getHackathonJudgeView.useQuery(
+      {
+        url: url as string,
+      },
+      {
+        enabled: !!session?.user && !publicData?.isOwner,
+      },
+    );
+
+  const isLoading = publicLoading || (publicData?.isOwner && managementLoading) || (!publicData?.isOwner && judgeLoading);
 
   if (isLoading) {
     return (
@@ -100,13 +111,27 @@ const DashUrl = () => {
             />
           </div>
 
+          {/* Stats Section */}
+          <div className="flex items-center space-x-6 rounded-lg border border-neutral-800 p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">
+                {managementData.participants?.length || 0}
+              </div>
+              <div className="text-sm text-gray-400">Participants</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">
+                {managementData.judgeCount || 0}
+              </div>
+              <div className="text-sm text-gray-400">Judges</div>
+            </div>
+          </div>
+
           {/* Participants Section */}
           {managementData.participants &&
           managementData.participants.length > 0 ? (
             <div>
-              <p className="mb-3">
-                {managementData.participants.length} participants
-              </p>
+              <h2 className="mb-3 text-lg font-semibold">Submissions</h2>
               <div className="mb-6 grid grid-cols-1 gap-8 md:grid-cols-2 lg:mb-16">
                 {managementData.participants
                   .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
@@ -118,6 +143,59 @@ const DashUrl = () => {
           ) : (
             <div className="flex flex-col items-center justify-center space-y-3">
               <Prepare url={hackathon.url} />
+            </div>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // Judge View (not owner but can judge)
+  if (judgeData?.isJudge) {
+    return (
+      <>
+        <Head>
+          <title>{hackathon.name} - Project Hackathon (Judge View)</title>
+        </Head>
+        <div className="mt-16 flex w-full flex-col justify-between space-y-3 border-b border-neutral-800 px-6 py-4 md:flex-row md:items-center md:space-y-0">
+          <div className="flex items-center space-x-4">
+            <Link href="/app">
+              <ArrowLeft
+                width={24}
+                className="cursor-pointer transition-all hover:-translate-x-0.5"
+              />
+            </Link>
+            <h1 className="text-xl font-medium md:text-2xl">
+              {hackathon.name}
+            </h1>
+            <span className="rounded-full bg-blue-600 px-2 py-1 text-xs font-medium text-white">
+              JUDGE
+            </span>
+          </div>
+        </div>
+        <div className="container mx-auto mt-8 space-y-8 px-6">
+          {/* Submissions Section for Judges */}
+          {judgeData.participants && judgeData.participants.length > 0 ? (
+            <div>
+              <h2 className="mb-3 text-lg font-semibold">
+                Submissions to Review ({judgeData.participants.length})
+              </h2>
+              <div className="mb-6 grid grid-cols-1 gap-8 md:grid-cols-2 lg:mb-16">
+                {judgeData.participants
+                  .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+                  .map((participant) => (
+                    <ParticipationCard key={participant.id} {...participant} />
+                  ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center space-y-3">
+              <div className="rounded-lg border border-neutral-800 p-8 text-center">
+                <h2 className="mb-2 text-xl font-medium">No Submissions Yet</h2>
+                <p className="text-gray-400">
+                  No participants have submitted projects to this hackathon yet.
+                </p>
+              </div>
             </div>
           )}
         </div>

@@ -12,6 +12,7 @@ import { inputStyles } from "@/ui/input";
 import DeleteHackathon from "./deleteHackathon";
 import { toast } from "sonner";
 import FinishHackathon from "./finishHackathon";
+import JudgeManager from "./judgeManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import clsx from "clsx";
 
@@ -58,13 +59,15 @@ const EditHackathon = (props: EditHackathonProps) => {
     <Modal
       btn={<Button icon={<Settings width={18} />}>Settings</Button>}
       title="Settings"
+      wide
     >
       <Tabs defaultValue="info" className="w-full">
-        <TabsList className="mb-2 w-full">
-          <TabsTrigger value="info">General</TabsTrigger>
-          <TabsTrigger value="rules">Rules & Criteria</TabsTrigger>
-          <TabsTrigger value="finish">Finish hackathon</TabsTrigger>
-          <TabsTrigger value="delete">Delete hackathon</TabsTrigger>
+        <TabsList className="mb-2 w-full grid grid-cols-2 md:grid-cols-5 h-auto gap-1 p-1">
+          <TabsTrigger value="info" className="text-xs px-2 py-2">General</TabsTrigger>
+          <TabsTrigger value="rules" className="text-xs px-2 py-2">Rules</TabsTrigger>
+          <TabsTrigger value="judges" className="text-xs px-2 py-2">Judges</TabsTrigger>
+          <TabsTrigger value="finish" className="text-xs px-2 py-2">Finish</TabsTrigger>
+          <TabsTrigger value="delete" className="text-xs px-2 py-2">Delete</TabsTrigger>
         </TabsList>
         <TabsContent value="info">
           <form className="mb-3 space-y-3" onSubmit={handleSubmit(onSubmit)}>
@@ -180,6 +183,9 @@ const EditHackathon = (props: EditHackathonProps) => {
               </Button>
             </div>
           </form>
+        </TabsContent>
+        <TabsContent value="judges">
+          <JudgeManager hackathonId={props.id} />
         </TabsContent>
         <TabsContent value="finish">
           <FinishHackathon url={props.url} is_finished={props.is_finished} />

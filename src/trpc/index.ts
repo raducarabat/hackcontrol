@@ -142,3 +142,117 @@ const enforceUserIsAdmin = t.middleware(({ ctx, next }) => {
  * the session is valid and guarantees `ctx.session.user` is not null and has ADMIN role.
  */
 export const adminProcedure = t.procedure.use(enforceUserIsAdmin);
+
+/** Reusable middleware that enforces users are logged in and have ADMIN or ORGANIZER role. */
+const enforceUserIsOrganizer = t.middleware(({ ctx, next }) => {
+  if (!ctx.session || !ctx.session.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  if (ctx.session.user.role !== "ADMIN" && ctx.session.user.role !== "ORGANIZER") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next({
+    ctx: {
+      session: { ...ctx.session, user: ctx.session.user },
+    },
+  });
+});
+
+/**
+ * Organizer procedure (ADMIN or ORGANIZER roles)
+ *
+ * If you want a query or mutation to be accessible to organizers and admins, use this.
+ */
+export const organizerProcedure = t.procedure.use(enforceUserIsOrganizer);
+
+/** Reusable middleware that enforces user can judge specific hackathon. */
+const enforceUserCanJudgeHackathon = t.middleware(async ({ ctx, next, input }) => {
+  if (!ctx.session || !ctx.session.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const hackathonId = (input as any)?.hackathonId;
+  if (!hackathonId) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "hackathonId required" });
+  }
+
+  const userId = ctx.session.user.id;
+  
+  if (ctx.session.user.role === "ADMIN") {
+    return next({
+      ctx: {
+        session: { ...ctx.session, user: ctx.session.user },
+      },
+    });
+  }
+
+  const isJudge = await ctx.prisma.judge.findUnique({
+    where: {
+      userId_hackathonId: {
+        userId,
+        hackathonId,
+      },
+    },
+  });
+
+  if (!isJudge) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to judge this hackathon" });
+  }
+
+  return next({
+    ctx: {
+      session: { ...ctx.session, user: ctx.session.user },
+    },
+  });
+});
+
+/**
+ * Judge procedure (for judging specific hackathons)
+ *
+ * Enforces that user can judge the hackathon specified in input.hackathonId
+ */
+export const judgeProcedure = t.procedure.use(enforceUserCanJudgeHackathon);
+
+/** Reusable middleware that enforces user can manage specific hackathon. */
+const enforceUserCanManageHackathon = t.middleware(async ({ ctx, next, input }) => {
+  if (!ctx.session || !ctx.session.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const hackathonId = (input as any)?.hackathonId;
+  if (!hackathonId) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "hackathonId required" });
+  }
+
+  const userId = ctx.session.user.id;
+  
+  if (ctx.session.user.role === "ADMIN") {
+    return next({
+      ctx: {
+        session: { ...ctx.session, user: ctx.session.user },
+      },
+    });
+  }
+
+  const hackathon = await ctx.prisma.hackathon.findUnique({
+    where: { id: hackathonId },
+    select: { creatorId: true },
+  });
+
+  if (!hackathon || hackathon.creatorId !== userId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to manage this hackathon" });
+  }
+
+  return next({
+    ctx: {
+      session: { ...ctx.session, user: ctx.session.user },
+    },
+  });
+});
+
+/**
+ * Hackathon management procedure
+ *
+ * Enforces that user can manage the hackathon specified in input.hackathonId
+ */
+export const hackathonManagerProcedure = t.procedure.use(enforceUserCanManageHackathon);
