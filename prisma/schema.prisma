@@ -30,20 +30,21 @@ model Widget {
 // -----------------------------------
 
 model Hackathon {
-  id             String          @id @default(cuid())
-  name           String
-  url            String          @unique
-  description    String?
-  rules          String?
-  criteria       String?
-  owner          User?           @relation(fields: [creatorId], references: [id])
-  creatorId      String
-  updatedAt      DateTime        @default(now()) @updatedAt
-  is_finished    Boolean         @default(false)
-  verified       Boolean         @default(false)
-  participations Participation[]
-  announcements  Announcement[]
-  Judge          Judge[]
+  id                   String          @id @default(cuid())
+  name                 String
+  url                  String          @unique
+  description          String?
+  rules                String?
+  criteria             String?
+  owner                User?           @relation(fields: [creatorId], references: [id])
+  creatorId            String
+  updatedAt            DateTime        @default(now()) @updatedAt
+  is_finished          Boolean         @default(false)
+  verified             Boolean         @default(false)
+  min_judges_required  Int             @default(2)
+  participations       Participation[]
+  announcements        Announcement[]
+  Judge                Judge[]
 
   @@unique([url, creatorId])
   @@map(name: "hackathons")
@@ -64,9 +65,25 @@ model Participation {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   hackathon      Hackathon? @relation(fields: [hackathon_url], references: [url], onDelete: Cascade)
+  scores         Score[]
 
   @@unique([creatorId, hackathon_url])
   @@map(name: "participations")
+}
+
+model Score {
+  id             String        @id @default(cuid())
+  judgeId        String
+  participationId String
+  score          Int
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  
+  judge          Judge         @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  participation  Participation @relation(fields: [participationId], references: [id], onDelete: Cascade)
+  
+  @@unique([judgeId, participationId])
+  @@map(name: "scores")
 }
 
 model Announcement {
@@ -147,6 +164,7 @@ model Judge {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
   inviter   User      @relation("JudgeInviter", fields: [invitedBy], references: [id])
+  scores    Score[]
 
   @@unique([userId, hackathonId])
   @@map(name: "judges")

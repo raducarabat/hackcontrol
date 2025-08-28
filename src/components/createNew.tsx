@@ -24,8 +24,8 @@ const CreateNew = () => {
 
   let url = nanoid(6);
 
-  // Only allow admin users to create hackathons
-  if (!session || session.user.role !== "ADMIN") {
+  // Only allow admin and organizer users to create hackathons
+  if (!session || (session.user.role !== "ADMIN" && session.user.role !== "ORGANIZER")) {
     return null;
   }
 
