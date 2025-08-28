@@ -207,6 +207,24 @@ export const hackathonRouter = createTRPCRouter({
         where: {
           hackathon_url: input.url,
         },
+        include: {
+          scores: {
+            include: {
+              judge: {
+                select: {
+                  id: true,
+                  userId: true,
+                  user: {
+                    select: {
+                      name: true,
+                      username: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
 
       const judgeCount = await ctx.prisma.judge.count({
@@ -392,10 +410,28 @@ export const hackathonRouter = createTRPCRouter({
         };
       }
 
-      // Get participants for this hackathon
+      // Get participants for this hackathon with scores
       const participants = await ctx.prisma.participation.findMany({
         where: {
           hackathon_url: input.url,
+        },
+        include: {
+          scores: {
+            include: {
+              judge: {
+                select: {
+                  id: true,
+                  userId: true,
+                  user: {
+                    select: {
+                      name: true,
+                      username: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
 
@@ -425,6 +461,67 @@ export const hackathonRouter = createTRPCRouter({
         );
       }
 
+      // Get all participations with their scores to determine winners
+      const participations = await ctx.prisma.participation.findMany({
+        where: {
+          hackathon_url: hackathon.url,
+        },
+        include: {
+          scores: true,
+        },
+      });
+
+      // Calculate rankings using the same logic as the scoring router
+      const ranked = participations
+        .map((participation) => {
+          const scores = participation.scores;
+          const totalScores = scores.length;
+          const averageScore = totalScores > 0 
+            ? scores.reduce((sum, s) => sum + s.score, 0) / totalScores 
+            : 0;
+
+          return {
+            ...participation,
+            averageScore,
+            totalScores,
+            isEligibleForRanking: totalScores >= hackathon.min_judges_required,
+          };
+        })
+        .filter(p => p.isEligibleForRanking)
+        .sort((a, b) => {
+          // Sort by average score descending, then by total scores descending as tiebreaker
+          if (b.averageScore !== a.averageScore) {
+            return b.averageScore - a.averageScore;
+          }
+          return b.totalScores - a.totalScores;
+        });
+
+      // Clear all existing winners first
+      await ctx.prisma.participation.updateMany({
+        where: {
+          hackathon_url: hackathon.url,
+        },
+        data: {
+          is_winner: false,
+          is_reviewed: true, // Mark all as reviewed when hackathon finishes
+        },
+      });
+
+      // Set the top submission as winner (if any eligible submissions exist)
+      if (ranked.length > 0) {
+        const winner = ranked[0];
+        await ctx.prisma.participation.update({
+          where: {
+            id: winner.id,
+          },
+          data: {
+            is_winner: true,
+            is_reviewed: true,
+          },
+        });
+      }
+
+      // Finish the hackathon
       const finishHackathon = await ctx.prisma.hackathon.update({
         where: {
           id: hackathon.id,
@@ -433,6 +530,17 @@ export const hackathonRouter = createTRPCRouter({
           is_finished: true,
         },
       });
-      return finishHackathon;
+
+      return {
+        ...finishHackathon,
+        winnersCount: ranked.length > 0 ? 1 : 0,
+        totalEligibleSubmissions: ranked.length,
+        winnerSubmission: ranked.length > 0 ? {
+          title: ranked[0].title,
+          creatorName: ranked[0].creatorName,
+          averageScore: ranked[0].averageScore,
+          totalJudges: ranked[0].totalScores,
+        } : null,
+      };
     }),
 });

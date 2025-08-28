@@ -25,6 +25,24 @@ export const participationRouter = createTRPCRouter({
         where: {
           hackathon_url: input.hackathonUrl,
         },
+        include: {
+          scores: {
+            include: {
+              judge: {
+                select: {
+                  id: true,
+                  userId: true,
+                  user: {
+                    select: {
+                      name: true,
+                      username: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
     }),
   //------

@@ -36,6 +36,16 @@ const DashUrl = () => {
       },
     );
 
+  // Check if the owner is also a judge (so they can score their own hackathon)
+  const { data: ownerJudgeStatus } = api.hackathon.getHackathonJudgeView.useQuery(
+    {
+      url: url as string,
+    },
+    {
+      enabled: !!publicData?.isOwner && !!managementData?.hackathon?.id,
+    },
+  );
+
   // Get judge view data if user might be a judge but not owner
   const { data: judgeData, isLoading: judgeLoading } =
     api.hackathon.getHackathonJudgeView.useQuery(
@@ -87,6 +97,11 @@ const DashUrl = () => {
             <span className="rounded-full bg-green-600 px-2 py-1 text-xs font-medium text-white">
               OWNER
             </span>
+            {ownerJudgeStatus?.isJudge && (
+              <span className="rounded-full bg-blue-600 px-2 py-1 text-xs font-medium text-white">
+                JUDGE
+              </span>
+            )}
           </div>
           <div className="flex items-center space-x-3">
             <CopyKey url={hackathon.url} />
@@ -136,7 +151,13 @@ const DashUrl = () => {
                 {managementData.participants
                   .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
                   .map((participant) => (
-                    <ParticipationCard key={participant.id} {...participant} />
+                    <ParticipationCard 
+                      key={participant.id} 
+                      participation={participant}
+                      isJudging={ownerJudgeStatus?.isJudge || false}
+                      hackathonId={hackathon.id}
+                      isHackathonFinished={hackathon.is_finished}
+                    />
                   ))}
               </div>
             </div>
@@ -184,7 +205,13 @@ const DashUrl = () => {
                 {judgeData.participants
                   .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
                   .map((participant) => (
-                    <ParticipationCard key={participant.id} {...participant} />
+                    <ParticipationCard 
+                      key={participant.id} 
+                      participation={participant}
+                      isJudging={true}
+                      hackathonId={hackathon.id}
+                      isHackathonFinished={hackathon.is_finished}
+                    />
                   ))}
               </div>
             </div>
