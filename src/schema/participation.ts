@@ -27,6 +27,14 @@ export const newParticipationSchema = z.object({
   hackathon_url: z.string(),
   hackathon_name: z.string(),
   project_url: z.string(),
+  team_members: z.object({
+    team_name: z.string().optional(),
+    members: z.array(z.object({
+      name: z.string(),
+      email: z.string().email(),
+      role: z.string().optional()
+    }))
+  }).optional()
 });
 
 export type newParticipation = z.TypeOf<typeof newParticipationSchema>;
