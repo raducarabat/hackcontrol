@@ -7,4 +7,12 @@ export type TParticipation = {
   project_url: string;
   hackathon_url: string;
   hackathon_name: string;
+  team_members?: {
+    team_name?: string;
+    members: Array<{
+      name: string;
+      email: string;
+      role?: string;
+    }>;
+  };
 };

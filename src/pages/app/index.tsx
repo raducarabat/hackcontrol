@@ -163,6 +163,21 @@ const Dashboard = () => {
                                 🏆 WINNER
                               </span>
                             )}
+                            {participant.team_members && typeof participant.team_members === 'object' && participant.team_members.members && Array.isArray(participant.team_members.members) && (
+                              <div className="mt-2">
+                                {participant.team_members.team_name && (
+                                  <div className="text-sm font-medium text-blue-400 mb-1">
+                                    👥 {participant.team_members.team_name}
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-400">
+                                  Team: {participant.team_members.members.map((member: any) => member.name).join(", ")}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {participant.team_members.members.length} member{participant.team_members.members.length !== 1 ? 's' : ''}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <Tooltip text="The hackathon administrators can mark each project as 'reviewed', here you will see if they have seen your project.">
                             <p className="mb-1 cursor-help text-sm">

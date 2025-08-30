@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
 import { toast } from "sonner";
-import { SubmitHandler, useForm } from "react-hook-form";
+import { SubmitHandler, useForm, useFieldArray } from "react-hook-form";
 import { api } from "@/trpc/api";
 import type { TParticipation } from "@/types/participation.type";
 
@@ -21,11 +21,21 @@ const SendProject = (hackathonProps: iSendProject) => {
   const {
     register,
     handleSubmit,
+    control,
+    watch,
     formState: { errors },
   } = useForm<TParticipation>();
 
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "team_members.members",
+  });
+
   const [loading, setLoading] = useState(false);
+  const [isTeamSubmission, setIsTeamSubmission] = useState(false);
   const router = useRouter();
+
+  const watchedTeamMembers = watch("team_members.members");
 
   const { mutate } = api.participation.createParticipation.useMutation({
     onSuccess: () => {
@@ -45,18 +55,30 @@ const SendProject = (hackathonProps: iSendProject) => {
   const onSubmit: SubmitHandler<TParticipation> = (data) => {
     try {
       setLoading(true);
-      mutate({
+      const submissionData = {
         title: data.title,
         description: data.description,
         project_url: data.project_url,
         hackathon_url: hackathonProps.url,
         hackathon_name: hackathonProps.name,
-      });
+        ...(isTeamSubmission && data.team_members && data.team_members.members.length > 0 && {
+          team_members: data.team_members
+        })
+      };
+      mutate(submissionData);
       toast.success("Your project has been successfully submitted");
     } catch (err) {
       setLoading(false);
       toast.error("Something went wrong");
     }
+  };
+
+  const addTeamMember = () => {
+    append({ name: "", email: "", role: "" });
+  };
+
+  const removeTeamMember = (index: number) => {
+    remove(index);
   };
 
   return (
@@ -71,6 +93,17 @@ const SendProject = (hackathonProps: iSendProject) => {
         {hackathonProps.description && (
           <p className="text-gray-400">{hackathonProps.description}</p>
         )}
+      </div>
+      <div className="mt-4">
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={isTeamSubmission}
+            onChange={(e) => setIsTeamSubmission(e.target.checked)}
+            className="rounded border-neutral-800 bg-neutral-900"
+          />
+          <span>Submit as a team</span>
+        </label>
       </div>
       <div className="mt-4">
         <label htmlFor="title">Title:</label>
@@ -121,6 +154,81 @@ const SendProject = (hackathonProps: iSendProject) => {
         />
         {errors.project_url && <Alert>{errors.project_url?.message}</Alert>}
       </div>
+      {isTeamSubmission && (
+        <div className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="team_name">Team Name (optional):</label>
+            <input
+              id="team_name"
+              className={inputStyles}
+              placeholder="Enter team name"
+              {...register("team_members.team_name")}
+            />
+          </div>
+          <div>
+            <label>Team Members:</label>
+            {fields.length === 0 && (
+              <p className="text-sm text-gray-400 mb-2">Add team members below</p>
+            )}
+            {fields.map((field, index) => (
+              <div key={field.id} className="border border-neutral-700 rounded p-3 mb-3">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="text-sm font-medium">Member {index + 1}</h4>
+                  <button
+                    type="button"
+                    onClick={() => removeTeamMember(index)}
+                    className="text-red-400 hover:text-red-300 text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <input
+                    placeholder="Full name"
+                    className={inputStyles}
+                    {...register(`team_members.members.${index}.name`, {
+                      required: "Name is required"
+                    })}
+                  />
+                  {errors.team_members?.members?.[index]?.name && (
+                    <Alert>{errors.team_members.members[index]?.name?.message}</Alert>
+                  )}
+                  <input
+                    placeholder="Email address"
+                    type="email"
+                    className={inputStyles}
+                    {...register(`team_members.members.${index}.email`, {
+                      required: "Email is required",
+                      pattern: {
+                        value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                        message: "Invalid email address"
+                      }
+                    })}
+                  />
+                  {errors.team_members?.members?.[index]?.email && (
+                    <Alert>{errors.team_members.members[index]?.email?.message}</Alert>
+                  )}
+                  <input
+                    placeholder="Role (optional)"
+                    className={inputStyles}
+                    {...register(`team_members.members.${index}.role`)}
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addTeamMember}
+              className="w-full border border-neutral-700 border-dashed rounded p-2 text-gray-400 hover:text-white hover:border-neutral-600 transition-colors"
+            >
+              + Add Team Member
+            </button>
+            {isTeamSubmission && fields.length === 0 && (
+              <Alert>Please add at least one team member</Alert>
+            )}
+          </div>
+        </div>
+      )}
       <Button type="submit" loadingstatus={loading}>
         {loading ? "Submitting..." : "Submit Project"}
       </Button>

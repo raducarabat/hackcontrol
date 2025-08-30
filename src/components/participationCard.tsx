@@ -99,6 +99,21 @@ const ParticipationCard = ({ participation: props, isJudging = false, hackathonI
             <span className="font-mono font-bold text-gray-500">
               {props.creatorName}
             </span>
+            {props.team_members && typeof props.team_members === 'object' && props.team_members.members && Array.isArray(props.team_members.members) && (
+              <div className="mt-2">
+                {props.team_members.team_name && (
+                  <div className="text-sm font-medium text-blue-400 mb-1">
+                    👥 {props.team_members.team_name}
+                  </div>
+                )}
+                <div className="text-xs text-gray-400">
+                  Team: {props.team_members.members.map((member: any) => member.name).join(", ")}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {props.team_members.members.length} member{props.team_members.members.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Score display */}
